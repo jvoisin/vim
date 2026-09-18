@@ -690,6 +690,27 @@ func Test_regexp_single_line_pat()
   unlet t tl e l
 endfunc
 
+" Test that the old (backtracking) engine, forced with \%#=1, turns the
+" [0-9], [0-7] and [0-9a-fA-F] collections into the faster \d, \o and \x
+" classes, while leaving the collections it must not convert untouched.
+func Test_recognize_char_class_old_engine()
+  " Collections that are converted to a character class.
+  call assert_equal('0123456789', matchstr('x0123456789x', '\%#=1[0-9]\+'))
+  call assert_equal('01234567', matchstr('x0123456789x', '\%#=1[0-7]\+'))
+  call assert_equal('0189abcdef', matchstr('x0189abcdefg', '\%#=1[0-9a-fA-F]\+'))
+
+  " Collections that must not be converted.
+  call assert_equal('0189abcdef', matchstr('x0189abcdefg', '\%#=1[0-9a-f]\+'))
+  call assert_equal('abcxyz', matchstr('0abcxyz1', '\%#=1[a-z]\+'))
+  call assert_equal('a;X+% ', matchstr('0a;X+% 9', '\%#=1[^0-9]\+'))
+  call assert_equal('9888', matchstr('asfi9888u', '\%#=1[0-9\n]\+'))
+  call assert_equal('9888', matchstr('asfi9888u', '\%#=1\_[0-9]\+'))
+
+  " Converted collections followed by a multi.
+  call assert_equal('abc44482ddd', matchstr('adf abc44482ddd oijs', '\%#=1abc[0-9]*ddd'))
+  call assert_equal('123', matchstr('x123456x', '\%#=1[0-9]\{2,3}'))
+endfunc
+
 " Tests for multi-line regexp patterns without multi-byte support.
 func Test_regexp_multiline_pat()
   " tl is a List of Lists with:

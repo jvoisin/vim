@@ -265,6 +265,36 @@ static const int classcodes[] = {
 };
 
 /*
+ * Search between "start" (the first char of the range) and "end" (the closing
+ * "]") and try to recognize a character class in expanded form, for example
+ * [0-9].  On success, return the atom to be emitted (DIGIT, OCTAL or HEX).  On
+ * failure, return 0.
+ */
+    static int
+bt_recognize_char_class(char_u *start, char_u *end)
+{
+    int		newl;
+    int		config = get_char_class_bits(start, end, &newl);
+
+    // A newline would need the ADD_NL variant, don't bother with it here.
+    if (config < 0 || newl)
+	return 0;
+
+    // Only the three ignorecase-independent ranges are converted here.  The
+    // letter ranges are left out because 'ignorecase' applies at execution
+    // time, so [a-z] may need to match as [a-zA-Z]: the NFA engine has
+    // NFA_LOWER_IC and friends for that, but the old engine has no such
+    // opcode, so LOWER is not the same thing as [a-z].
+    switch (config)
+    {
+	case CLASS_o9:				return DIGIT;
+	case CLASS_o7:				return OCTAL;
+	case CLASS_af | CLASS_AF | CLASS_o9:	return HEX;
+    }
+    return 0;
+}
+
+/*
  * When regcode is set to this value, code is not emitted and size is computed
  * instead.
  */
@@ -1728,6 +1758,21 @@ collection:
 	    {
 		int	startc = -1;	// > 0 when next '-' is a range
 		int	endc;
+
+		if (extra == 0)
+		{
+		    int	cl = bt_recognize_char_class(regparse, lp);
+
+		    if (cl != 0)
+		    {
+			ret = regnode(cl);
+			regparse = lp;
+			prevchr_len = 1;
+			skipchr();
+			*flagp |= HASWIDTH | SIMPLE;
+			break;
+		    }
+		}
 
 		// In a character class, different parsing rules apply.
 		// Not even \ is special anymore, nothing is.
