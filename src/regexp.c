@@ -2901,7 +2901,7 @@ init_regexec_multi(
  * Parse the "[...]" collection between "start" (the first character after the
  * "[") and "end" (the "]") into a combination of CLASS_ bits, so that it can
  * be turned into a faster character class like \d or \x.  Sets "*newl" to TRUE
- * when the collection also matches a newline. Returns -1 when the collection
+ * when the collection also matches a newline.  Returns -1 when the collection
  * is not a plain combination of the recognized ranges.
  */
     static int

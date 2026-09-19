@@ -267,8 +267,9 @@ static const int classcodes[] = {
 /*
  * Search between "start" (the first char of the range) and "end" (the closing
  * "]") and try to recognize a character class in expanded form, for example
- * [0-9].  On success, return the atom to be emitted (DIGIT, OCTAL or HEX).  On
- * failure, return 0.
+ * [0-9].  On success, return the atom to be emitted (DIGIT, NDIGIT, HEX, NHEX,
+ * OCTAL, NOCTAL, WORD, NWORD, HEAD, NHEAD, ALPHA or NALPHA).  On failure,
+ * return 0.
  */
     static int
 bt_recognize_char_class(char_u *start, char_u *end)
@@ -280,16 +281,31 @@ bt_recognize_char_class(char_u *start, char_u *end)
     if (config < 0 || newl)
 	return 0;
 
-    // Only the three ignorecase-independent ranges are converted here.  The
-    // letter ranges are left out because 'ignorecase' applies at execution
-    // time, so [a-z] may need to match as [a-zA-Z]: the NFA engine has
-    // NFA_LOWER_IC and friends for that, but the old engine has no such
-    // opcode, so LOWER is not the same thing as [a-z].
+    // Only ranges that are unaffected by 'ignorecase' are converted here, since
+    // 'ignorecase' applies at execution time.  The digit, hex, octal, word,
+    // head and alpha classes have no case or already contain both cases, so the
+    // emitted atom matches the collection identically.  Only the bare LOWER
+    // ([a-z]), UPPER ([A-Z]) ranges and their negations ([^a-z], [^A-Z]) are
+    // left out: with 'ignorecase' [a-z] may need to match as [a-zA-Z], and the
+    // old engine has no NFA_LOWER_IC equivalent, so LOWER is not the same thing
+    // as [a-z].
     switch (config)
     {
-	case CLASS_o9:				return DIGIT;
-	case CLASS_o7:				return OCTAL;
-	case CLASS_af | CLASS_AF | CLASS_o9:	return HEX;
+	case CLASS_o9:					return DIGIT;
+	case CLASS_not | CLASS_o9:			return NDIGIT;
+	case CLASS_af | CLASS_AF | CLASS_o9:		return HEX;
+	case CLASS_not | CLASS_af | CLASS_AF | CLASS_o9: return NHEX;
+	case CLASS_o7:					return OCTAL;
+	case CLASS_not | CLASS_o7:			return NOCTAL;
+	case CLASS_az | CLASS_AZ | CLASS_o9 | CLASS_underscore:
+							return WORD;
+	case CLASS_not | CLASS_az | CLASS_AZ | CLASS_o9 | CLASS_underscore:
+							return NWORD;
+	case CLASS_az | CLASS_AZ | CLASS_underscore:	return HEAD;
+	case CLASS_not | CLASS_az | CLASS_AZ | CLASS_underscore:
+							return NHEAD;
+	case CLASS_az | CLASS_AZ:			return ALPHA;
+	case CLASS_not | CLASS_az | CLASS_AZ:		return NALPHA;
     }
     return 0;
 }
